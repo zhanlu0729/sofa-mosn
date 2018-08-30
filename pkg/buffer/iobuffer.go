@@ -70,6 +70,10 @@ func (b *IoBuffer) ReadStep(r io.Reader) (n int, err error, finished bool) {
 		b.Reset()
 	}
 
+	if b.off > 0 && len(b.buf)-b.off < 4*MinRead {
+		b.copy(0)
+	}
+
 	if free := cap(b.buf) - len(b.buf); free < MinRead {
 		// not enough space at end
 		if b.off+free < MinRead {

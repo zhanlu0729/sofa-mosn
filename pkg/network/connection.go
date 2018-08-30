@@ -40,7 +40,7 @@ import (
 // Network related const
 const (
 	ConnectionCloseDebugMsg   = "Close connection %d, event %s, type %s, data read %d, data write %d"
-	DefaultBufferReadCapacity = 1 << 0
+	DefaultBufferReadCapacity = 1 << 16
 )
 
 var idCounter uint64 = 1
@@ -869,11 +869,13 @@ func (cc *clientConnection) Connect(ioEnabled bool) (err error) {
 		} else {
 			event = types.Connected
 
-			// store fd
-			if tc, ok := cc.rawConnection.(*net.TCPConn); ok {
-				cc.file, err = tc.File()
-				if err != nil {
-					return
+			if ioEnabled && UseNetpollMode {
+				// store fd
+				if tc, ok := cc.rawConnection.(*net.TCPConn); ok {
+					cc.file, err = tc.File()
+					if err != nil {
+						return
+					}
 				}
 			}
 
