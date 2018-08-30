@@ -81,7 +81,7 @@ type eventLoop struct {
 
 func (el *eventLoop) register(conn *connection, handler *connEventHandler) error {
 	// handle read
-	read, err := netpoll.HandleFile(conn.file, netpoll.EventRead|netpoll.EventOneShot)
+	read, err := netpoll.HandleFile(conn.file, netpoll.EventRead)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (el *eventLoop) register(conn *connection, handler *connEventHandler) error
 	}
 
 	// register with wrapper
-	el.poller.Start(read, el.readWrapper(read, handler))
+	el.poller.Start(read, el.readWrapper(read, conn, handler))
 	el.poller.Start(write, el.writeWrapper(write, handler))
 
 	el.mu.Lock()
@@ -108,13 +108,13 @@ func (el *eventLoop) register(conn *connection, handler *connEventHandler) error
 
 func (el *eventLoop) registerRead(conn *connection, handler *connEventHandler) error {
 	// handle read
-	read, err := netpoll.HandleFile(conn.file, netpoll.EventRead|netpoll.EventOneShot)
+	read, err := netpoll.HandleFile(conn.file, netpoll.EventRead)
 	if err != nil {
 		return err
 	}
 
 	// register
-	el.poller.Start(read, el.readWrapper(read, handler))
+	el.poller.Start(read, el.readWrapper(read, conn, handler))
 
 	el.mu.Lock()
 	//store
@@ -186,7 +186,7 @@ func (el *eventLoop) unregisterWrite(id uint64) {
 	}
 }
 
-func (el *eventLoop) readWrapper(desc *netpoll.Desc, handler *connEventHandler) func(netpoll.Event) {
+func (el *eventLoop) readWrapper(desc *netpoll.Desc, conn *connection, handler *connEventHandler) func(netpoll.Event) {
 	return func(e netpoll.Event) {
 		// No more calls will be made for conn until we call epoll.Resume().
 		if e&netpoll.EventReadHup != 0 {
@@ -195,12 +195,15 @@ func (el *eventLoop) readWrapper(desc *netpoll.Desc, handler *connEventHandler) 
 				return
 			}
 		}
-		readPool.Schedule(func() {
-			if !handler.onRead() {
-				return
-			}
-			el.poller.Resume(desc)
-		})
+		if atomic.CompareAndSwapUint32(&conn.readSched, 0, 1) {
+			readPool.ScheduleAlways(func() {
+				defer atomic.CompareAndSwapUint32(&conn.readSched, 1, 0)
+
+				if !handler.onRead() {
+					return
+				}
+			})
+		}
 	}
 }
 

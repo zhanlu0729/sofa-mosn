@@ -65,6 +65,36 @@ func (b *IoBuffer) Read(p []byte) (n int, err error) {
 	return
 }
 
+func (b *IoBuffer) ReadStep(r io.Reader) (n int, err error, finished bool) {
+	if b.off >= len(b.buf) {
+		b.Reset()
+	}
+
+	if free := cap(b.buf) - len(b.buf); free < MinRead {
+		// not enough space at end
+		if b.off+free < MinRead {
+			// not enough space using beginning of buffer;
+			// double buffer capacity
+			b.copy(MinRead)
+		} else {
+			b.copy(0)
+		}
+	}
+
+	l := cap(b.buf) - len(b.buf)
+
+	n, err = r.Read(b.buf[len(b.buf):cap(b.buf)])
+
+	if err != nil {
+		finished = true
+		return
+	}
+
+	b.buf = b.buf[0 : len(b.buf)+n]
+	finished = l != n
+	return
+}
+
 func (b *IoBuffer) ReadOnce(r io.Reader) (n int64, err error) {
 	var conn net.Conn
 	var loop, ok, first = true, true, true

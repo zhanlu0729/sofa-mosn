@@ -80,6 +80,7 @@ type connection struct {
 	internalStopChan    chan struct{}
 	// eventLoop fields:
 	writeSchedChan chan bool // writable if not scheduled yet.
+	readSched      uint32
 
 	stats              *types.ConnectionStats
 	lastBytesSizeRead  int64
@@ -365,28 +366,29 @@ func (c *connection) doRead() (err error) {
 		c.readBuffer = buffer.GetIoBuffer(DefaultBufferReadCapacity)
 	}
 
-	var bytesRead int64
+	bytesRead := 0
+	finished := false
 
-	bytesRead, err = c.readBuffer.ReadOnce(c.rawConnection)
+	for !finished {
+		bytesRead, err, finished = c.readBuffer.ReadStep(c.rawConnection)
 
-	if err != nil {
-		if te, ok := err.(net.Error); ok && te.Timeout() {
-			if bytesRead == 0 {
+		if err != nil {
+			if te, ok := err.(net.Error); ok && te.Timeout() {
+				if bytesRead == 0 {
+					return err
+				}
+			} else {
 				return err
 			}
-		} else {
-			return err
 		}
+		c.updateReadBufStats(int64(bytesRead), int64(c.readBuffer.Len()))
+
+		for _, cb := range c.bytesReadCallbacks {
+			cb(uint64(bytesRead))
+		}
+
+		c.onRead(int64(bytesRead))
 	}
-
-	c.updateReadBufStats(bytesRead, int64(c.readBuffer.Len()))
-
-	for _, cb := range c.bytesReadCallbacks {
-		cb(uint64(bytesRead))
-	}
-
-	c.onRead(bytesRead)
-
 	return
 }
 

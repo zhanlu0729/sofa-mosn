@@ -40,6 +40,12 @@ type IoBuffer interface {
 	// otherwise it is nil.
 	Read(p []byte) (n int, err error)
 
+	// ReadStep make a single step read without loop and appends it to the buffer, growing
+	// the buffer as needed. The return value n is the number of bytes read.Any error except
+	// io.EOF encountered during the read is also returned. If the
+	// buffer becomes too large, ReadFrom will panic with ErrTooLarge.
+	ReadStep(r io.Reader) (n int, err error, finished bool)
+
 	// ReadOnce make a one-shot read and appends it to the buffer, growing
 	// the buffer as needed. The return value n is the number of bytes read. Any
 	// error except io.EOF encountered during the read is also returned. If the
