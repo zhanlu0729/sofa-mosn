@@ -35,6 +35,7 @@ import (
 	xdslistener "github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
 	xdsroute "github.com/envoyproxy/go-control-plane/envoy/api/v2/route"
 	xdsaccesslog "github.com/envoyproxy/go-control-plane/envoy/config/accesslog/v2"
+	xdsfault "github.com/envoyproxy/go-control-plane/envoy/config/filter/fault/v2"
 	xdshttp "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/http_connection_manager/v2"
 	xdstcp "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
 	xdsutil "github.com/envoyproxy/go-control-plane/pkg/util"
@@ -80,6 +81,7 @@ func convertListenerConfig(xdsListener *xdsapi.Listener) *v2.ListenerConfig {
 
 	// it must be 1 filechains and 1 networkfilter by design
 	if listenerConfig.FilterChains != nil && len(listenerConfig.FilterChains) == 1 && listenerConfig.FilterChains[0].Filters != nil && len(listenerConfig.FilterChains[0].Filters) == 1 && listenerConfig.FilterChains[0].Filters[0].Config != nil {
+		listenerConfig.StreamFilters = convertStreamFilters(&xdsListener.FilterChains[0].Filters[0])
 		if downstreamProtocol, ok := listenerConfig.FilterChains[0].Filters[0].Config["DownstreamProtocol"]; ok {
 			// Note: as we use fasthttp and net/http2.0, the IO we created in mosn should be disabled
 			// in the future, if we realize these two protocol by-self, this this hack method should be removed
@@ -317,6 +319,50 @@ func convertFilterConfig(name string, s *types.Struct) map[string]interface{} {
 
 	log.DefaultLogger.Errorf("unsupported filter config, filter name: %s", name)
 	return nil
+}
+
+func convertStreamFilters(networkFilter *xdslistener.Filter) []v2.Filter {
+	filters := make([]v2.Filter, 0)
+	name := networkFilter.GetName()
+	if httpBaseConfig[name] {
+		filterConfig := &xdshttp.HttpConnectionManager{}
+		xdsutil.StructToMessage(networkFilter.GetConfig(), filterConfig)
+
+		for _, filter := range filterConfig.GetHttpFilters() {
+			streamFilter := convertStreamFilter(filter.GetName(), filter.GetConfig())
+			filters = append(filters, streamFilter)
+		}
+	}else if name == v2.X_PROXY {
+		filterConfig := &xdsxproxy.XProxy{}
+		xdsutil.StructToMessage(networkFilter.GetConfig(), filterConfig)
+		for _, filter := range filterConfig.GetStreamFilters() {
+			streamFilter := convertStreamFilter(filter.GetName(), filter.GetConfig())
+			filters = append(filters, streamFilter)
+		}
+	}
+	return filters
+}
+
+func convertStreamFilter(name string, s *types.Struct) v2.Filter {
+	filter := v2.Filter{}
+	switch name{
+	case xdsutil.Fault:
+		filter.Name = v2.FAULT_INJECT_NETWORK_FILTER
+		filter.Config = convertFaultConfig(s)
+	default:
+
+	}
+	return filter
+}
+
+func convertFaultConfig(s *types.Struct) map[string]interface{} {
+	faultConfig := &xdsfault.FaultDelay{}
+	xdsutil.StructToMessage(s, faultConfig)
+	fault := v2.FaultInject{
+		DelayPercent: faultConfig.GetPercent(),
+		DelayDuration: uint64(*faultConfig.GetFixedDelay()),
+	}
+	return structs.Map(fault)
 }
 
 func convertXProxyExtendConfig(config *xdsxproxy.XProxy) map[string]interface{} {
