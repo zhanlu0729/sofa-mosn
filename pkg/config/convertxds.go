@@ -358,6 +358,9 @@ func convertStreamFilter(name string, s *types.Struct) v2.Filter {
 func convertFaultConfig(s *types.Struct) map[string]interface{} {
 	faultConfig := &xdsfault.FaultDelay{}
 	xdsutil.StructToMessage(s, faultConfig)
+	if faultConfig.Size() == 0 {
+		return nil
+	}
 	fault := v2.FaultInject{
 		DelayPercent: faultConfig.GetPercent(),
 		DelayDuration: uint64(*faultConfig.GetFixedDelay()),
