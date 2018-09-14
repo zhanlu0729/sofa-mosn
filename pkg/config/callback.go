@@ -63,6 +63,7 @@ func (config *MOSNConfig) OnAddOrUpdateListeners(listeners []*pb.Listener) {
 			listeners, networkFilters, streamFilters)
 
 		if err := listenerAdapter.AddOrUpdateListener("", mosnListener, networkFilters, streamFilters); err == nil {
+			config.Servers[0].Listeners = append(config.Servers[0].Listeners, *mosnListener)
 			log.DefaultLogger.Debugf("xds AddOrUpdateListener success,listener address = %s", mosnListener.Addr.String())
 		} else {
 			log.DefaultLogger.Errorf("xds AddOrUpdateListener failure,listener address = %s, msg = %s ",

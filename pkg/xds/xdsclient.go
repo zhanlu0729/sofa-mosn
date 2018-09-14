@@ -196,10 +196,10 @@ func UnmarshalResources(config *config.MOSNConfig) (dynamicResources *bootstrap.
 
 // Start used to fetch listeners/clusters/clusterloadassignment config from pilot in cycle,
 // usually called when mosn start
-func (c *Client) Start(config *config.MOSNConfig, serviceCluster, serviceNode string) error {
+func (c *Client) Start(conf *config.MOSNConfig, serviceCluster, serviceNode string, ch chan *config.MOSNConfig) error {
 	log.DefaultLogger.Infof("xds client start")
 	if c.v2 == nil {
-		dynamicResources, staticResources, err := UnmarshalResources(config)
+		dynamicResources, staticResources, err := UnmarshalResources(conf)
 		if err != nil {
 			log.DefaultLogger.Warnf("fail to unmarshal xds resources, skip xds: %v", err)
 			return errors.New("fail to unmarshal xds resources")
@@ -227,6 +227,7 @@ func (c *Client) Start(config *config.MOSNConfig, serviceCluster, serviceNode st
 	}
 	adsClient.Start()
 	c.adsClient = adsClient
+	ch <- adsClient.MosnConfig
 	return nil
 }
 

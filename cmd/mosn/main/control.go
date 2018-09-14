@@ -21,6 +21,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/alipay/sofa-mosn/pkg/admin"
 	"github.com/alipay/sofa-mosn/pkg/config"
 	"github.com/alipay/sofa-mosn/pkg/mosn"
 	"github.com/urfave/cli"
@@ -51,11 +52,16 @@ var (
 				// pprof server
 				http.ListenAndServe("0.0.0.0:9090", nil)
 			}()
+
+			ch := make(chan *config.MOSNConfig)
+			admin.Start(ch)
+
 			configPath := c.String("config")
 			serviceCluster := c.String("service-cluster")
 			serviceNode := c.String("service-node")
 			conf := config.Load(configPath)
-			mosn.Start(conf, serviceCluster, serviceNode)
+
+			mosn.Start(conf, serviceCluster, serviceNode, ch)
 			return nil
 		},
 	}
