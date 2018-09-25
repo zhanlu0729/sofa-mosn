@@ -56,7 +56,6 @@ func (rw *RoutersWrapper) GetRouters() types.Routers {
 }
 
 func NewRouterManager() types.RouterManager {
-
 	instanceMutex.Lock()
 	defer instanceMutex.Unlock()
 
