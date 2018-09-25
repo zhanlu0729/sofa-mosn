@@ -174,6 +174,15 @@ func (s *downStream) cleanStream() {
 	}
 
 	for _, ef := range s.receiverFilters {
+		filter := ef.filter
+		if al, ok := filter.(types.AccessLog); ok {
+			var downstreamRespHeadersMap map[string]string
+			if v, ok := s.downstreamRespHeaders.(map[string]string); ok {
+				downstreamRespHeadersMap = v
+			}
+			al.Log(s.downstreamReqHeaders, downstreamRespHeadersMap, s.requestInfo)
+		}
+
 		ef.filter.OnDestroy()
 	}
 

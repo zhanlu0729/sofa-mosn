@@ -294,3 +294,14 @@ func GetNetworkFilters(c *v2.FilterChain) []types.NetworkFilterChainFactory {
 	}
 	return factories
 }
+
+// ParseMixerFilter
+func ParseMixerFilter(cfg map[string]interface{}) *v2.MixerFilterConfig {
+	filterConfig := &v2.MixerFilterConfig{}
+	if data, err := json.Marshal(cfg); err == nil {
+		json.Unmarshal(data, filterConfig)
+	} else {
+		log.StartLogger.Fatal("parsing mixer filter config error")
+	}
+	return filterConfig
+}

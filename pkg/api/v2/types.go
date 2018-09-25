@@ -346,3 +346,15 @@ type PublishContent struct {
 	ServiceName string `json:"service_name,omitempty"`
 	PubData     string `json:"pub_data,omitempty"`
 }
+
+// MixerFilterConfig
+type MixerFilterConfig struct {
+	Type                string                 `json:"type"`
+	Name                string                 `json:"name"`
+	DownstreamProtocol  string                 `json:"downstream_protocol"`
+	UpstreamProtocol    string                 `json:"upstream_protocol"`
+	SupportDynamicRoute bool                   `json:"support_dynamic_route"`
+	VirtualHosts        []*VirtualHost         `json:"virtual_hosts"`
+	ValidateClusters    bool                   `json:"validate_clusters"`
+	ExtendConfig        map[string]interface{} `json:"extend_config"`
+}
